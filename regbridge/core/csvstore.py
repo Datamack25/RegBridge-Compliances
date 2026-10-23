@@ -65,6 +65,36 @@ def upsert(name: str, key: str, row: dict) -> str:
         return "ajout"
 
 
+def merge_seed(name: str, seed_path: str, key: str = "id") -> None:
+    """Ajoute au référentiel les lignes et colonnes nouvelles du fichier seed (identifiant `key`).
+    Ne remplace jamais une valeur déjà renseignée ; ne fait rien si le fichier n'a pas de clé."""
+    seed = pd.read_csv(seed_path, sep=";", encoding="utf-8-sig", dtype=str, keep_default_na=False)
+    if seed.empty or key not in seed.columns:
+        return
+    with _lock:
+        df = read(name)
+        if df.empty or key not in df.columns:
+            return
+        changed = False
+        for c in seed.columns:
+            if c not in df.columns:
+                df[c] = ""
+                changed = True
+        s = seed.set_index(key)
+        for i, k in df[key].items():
+            if k in s.index:
+                for c in seed.columns:
+                    if c != key and df.at[i, c] == "" and s.at[k, c] != "":
+                        df.at[i, c] = s.at[k, c]
+                        changed = True
+        new = seed[~seed[key].isin(set(df[key]))]
+        if not new.empty:
+            df = pd.concat([df, new], ignore_index=True).fillna("")
+            changed = True
+        if changed:
+            _write(name, df)
+
+
 def update_where(name: str, key: str, value: str, changes: dict) -> None:
     with _lock:
         df = read(name)

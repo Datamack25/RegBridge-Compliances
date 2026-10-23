@@ -30,7 +30,7 @@ def render(tab, user, sid):
 
     elif tab == "Référentiel":
         c = st.columns(3)
-        cat = c[0].multiselect("Catégorie", sorted(valid["categorie"].unique()))
+        cat = c[0].multiselect("Catégorie", sorted(valid["categorie"].unique()), placeholder="Choisir")
         sec = c[1].text_input("Secteur contient")
         q = c[2].text_input("Mot-clé (typologie, signal)")
         f = valid
@@ -96,7 +96,7 @@ def render(tab, user, sid):
                 st.success("Typologie enregistrée" + (" et validée." if user["role"] == "admin" else ", en attente de validation."))
 
     elif tab == "Exports":
-        cat = st.multiselect("Catégories à exporter", sorted(valid["categorie"].unique()))
+        cat = st.multiselect("Catégories à exporter", sorted(valid["categorie"].unique()), placeholder="Choisir")
         f = valid[valid["categorie"].isin(cat)] if cat else valid
         ui.export_panel(user, sid, {
             "title": "Référentiel des typologies de fraude et de blanchiment",

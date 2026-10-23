@@ -33,7 +33,7 @@ def _filters(df, key):
     c = st.columns(4)
     for i, col in enumerate(["regime", "type_changement", "type_entite", "pays"]):
         opts = sorted(v for v in df[col].unique() if v)
-        sel = c[i].multiselect(col.replace("_", " ").capitalize(), opts, key=f"{key}_{col}")
+        sel = c[i].multiselect(col.replace("_", " ").capitalize(), opts, key=f"{key}_{col}", placeholder="Choisir")
         if sel:
             df = df[df[col].isin(sel)]
     return df

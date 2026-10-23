@@ -82,6 +82,10 @@ def to_pdf(ctx: dict) -> bytes:
             story.append(Paragraph(esc(p), body))
         for b in s.get("bullets", []):
             story.append(Paragraph(esc(b), body, bulletText="•"))
+        for label, url in s.get("links", []):
+            if url:
+                story.append(Paragraph(f'<link href="{esc(url)}" color="{TEAL}"><u>{esc(label)}</u></link>'
+                                       f' <font size=7.5 color="#5B6770">{esc(url)}</font>', body))
         tb = s.get("table")
         if tb and tb.get("rows"):
             cols = tb["columns"]
@@ -121,6 +125,21 @@ def to_pdf(ctx: dict) -> bytes:
 
 
 # ------------------------------------------------------------------ Word
+def _hyperlink(paragraph, url: str, text: str) -> None:
+    """Lien cliquable dans un document Word (python-docx n'a pas de fonction dédiée)."""
+    from docx.oxml import OxmlElement
+    from docx.oxml.ns import qn
+    from docx.opc.constants import RELATIONSHIP_TYPE as RT
+    r_id = paragraph.part.relate_to(url, RT.HYPERLINK, is_external=True)
+    link = OxmlElement("w:hyperlink"); link.set(qn("r:id"), r_id)
+    run = OxmlElement("w:r"); rpr = OxmlElement("w:rPr")
+    color = OxmlElement("w:color"); color.set(qn("w:val"), "0E7C86")
+    under = OxmlElement("w:u"); under.set(qn("w:val"), "single")
+    rpr.append(color); rpr.append(under); run.append(rpr)
+    t = OxmlElement("w:t"); t.text = text; run.append(t)
+    link.append(run); paragraph._p.append(link)
+
+
 def to_docx(ctx: dict) -> bytes:
     from docx import Document
     from docx.shared import Pt, RGBColor
@@ -147,6 +166,9 @@ def to_docx(ctx: dict) -> bytes:
             d.add_paragraph(str(p))
         for b in s.get("bullets", []):
             d.add_paragraph(str(b), style="List Bullet")
+        for label, url in s.get("links", []):
+            if url:
+                _hyperlink(d.add_paragraph(), url, f"{label} ↗")
         tb = s.get("table")
         if tb and tb.get("rows"):
             t = d.add_table(rows=1, cols=len(tb["columns"]))

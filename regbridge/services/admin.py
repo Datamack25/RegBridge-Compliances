@@ -80,7 +80,7 @@ def render(admin: dict) -> None:
         else:
             c = st.columns([3, 3, 2, 2])
             uid = c[0].selectbox("Utilisateur", clients["id"].tolist(), format_func=lambda i: label[i], key="g_user")
-            sids = c[1].multiselect("Services", list(SERVICES), format_func=lambda s: f"{SERVICES[s]['icon']} {SERVICES[s]['name']}")
+            sids = c[1].multiselect("Services", list(SERVICES), format_func=lambda s: f"{SERVICES[s]['icon']} {SERVICES[s]['name']}", placeholder="Choisir")
             plan = c[2].selectbox("Offre", ["pro", "equipe", "entreprise", "essai"])
             dur = c[3].selectbox("Durée", ["1 mois", "3 mois", "12 mois", "7 jours (essai)", "sans échéance"])
             if st.button("Activer l'accès", type="primary", disabled=not sids):

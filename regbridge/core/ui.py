@@ -14,15 +14,52 @@ CSS = """
 /* Couleurs lisibles en thème clair comme en thème sombre */
 .rb-brand { font-weight:800; color:#14A3AE; font-size:1.35rem; letter-spacing:.2px; }
 .rb-sub { color:#8A96A3; font-size:.86rem; }
+.rb-tile-family { color:#0E7C86; font-size:.68rem; font-weight:700; text-transform:uppercase; letter-spacing:.08em; margin-bottom:.35rem; }
 .rb-tile-icon { font-size:1.9rem; line-height:1; }
 .rb-tile-name { font-weight:700; color:#14A3AE; margin-top:.35rem; }
-.rb-tile-pitch { color:#8A96A3; font-size:.8rem; min-height:2.6rem; }
+.rb-tile-pitch { color:#8A96A3; font-size:.8rem; min-height:3.9rem; }
 /* Écran d'accueil : formulaire compact dans une carte */
 /* Boutons principaux aux couleurs de la marque, même sans .streamlit/config.toml */
 button[data-testid="stBaseButton-primary"], button[data-testid="stBaseButton-primaryFormSubmit"] {
   background:#0E7C86 !important; border-color:#0E7C86 !important; color:#fff !important; }
 button[data-testid="stBaseButton-primary"]:hover, button[data-testid="stBaseButton-primaryFormSubmit"]:hover {
   background:#0B6870 !important; border-color:#0B6870 !important; }
+/* Tableau de veille (style bulletin) : fond propre, lisible quel que soit le thème */
+.rbw { background:#FFFFFF; color:#1B2733; border:1px solid #E6E1D3; border-radius:12px; padding:4px 0 6px;
+       font-family:'Source Sans Pro',Helvetica,Arial,sans-serif; overflow-x:auto; }
+.rbw-inner { min-width:940px; }
+.rbw-grid { display:grid; grid-template-columns: 78px minmax(200px,2fr) minmax(200px,2.1fr) 108px 88px 66px 80px 56px; gap:10px;
+            gap:12px; align-items:start; padding:11px 16px; }
+.rbw-head { font-size:11.5px; font-weight:700; letter-spacing:.06em; text-transform:uppercase; color:#1B2733;
+            border-bottom:2px solid #C9A227; padding-top:8px; padding-bottom:9px; }
+.rbw details { border-bottom:1px solid #EEEBE3; }
+.rbw details:nth-of-type(even) { background:#FAF8F2; }
+.rbw details[open] { background:#F2F8F9; }
+.rbw summary { list-style:none; cursor:pointer; }
+.rbw summary::-webkit-details-marker { display:none; }
+.rbw summary:hover .rbw-title { text-decoration:underline; }
+.rbw-title { color:#0B2545; font-weight:700; font-size:14.5px; line-height:1.3; }
+.rbw-caret { display:inline-block; color:#0E7C86; margin-right:6px; transition:transform .15s; }
+.rbw details[open] .rbw-caret { transform:rotate(90deg); }
+.rbw-ref { color:#6B7480; font-size:12px; margin-top:3px; }
+.rbw-cell { font-size:13.5px; line-height:1.35; color:#1B2733; }
+.rbw-short { font-size:13.5px; line-height:1.4; color:#33404D; }
+.rbw-flag { display:flex; align-items:center; gap:7px; font-size:13.5px; }
+.rbw-flag img { width:22px; height:15px; border-radius:2px; box-shadow:0 0 0 1px rgba(0,0,0,.12); }
+.rbw-imp { font-weight:800; font-size:13.5px; }
+.rbw-new { display:inline-block; margin-left:6px; padding:1px 6px; border-radius:4px; background:#0E7C86; color:#fff;
+           font-size:10px; font-weight:700; letter-spacing:.05em; vertical-align:2px; }
+.rbw a { color:#0E7C86; font-weight:600; text-decoration:none; }
+.rbw a:hover { text-decoration:underline; }
+.rbw-body { padding:2px 24px 16px 116px; color:#1B2733; }
+.rbw-body p { font-size:14.5px; line-height:1.6; margin:4px 0 10px; max-width:980px; }
+.rbw-meta { font-size:12.5px; color:#5B6770; margin:6px 0 10px; }
+.rbw-action { font-size:13.5px; margin:0 0 12px; }
+.rbw-btn { display:inline-block; padding:7px 14px; border-radius:8px; background:#0E7C86; color:#FFFFFF !important; font-size:13px; }
+.rbw-banner { background:#FBF7EA; border:1px solid #E8DDB5; border-radius:12px; padding:14px 20px; margin-bottom:12px; }
+.rbw-banner b { color:#B8901B; font-size:24px; font-weight:800; display:block; }
+.rbw-banner span { color:#5B6770; font-size:14px; }
+.rbw-foot { color:#8A96A3; font-size:11.5px; padding:10px 16px 2px; }
 .rb-auth-title { font-weight:800; font-size:1.25rem; margin:0 0 .15rem; }
 .rb-auth-sub { color:#8A96A3; font-size:.85rem; margin-bottom:.6rem; }
 .rb-badge { display:inline-block; padding:.1rem .5rem; border-radius:999px; font-size:.72rem; font-weight:700; }
@@ -115,6 +152,84 @@ def hero(title: str, text: str, chips: list[str], footnote: str = "") -> None:
 </div>""")
 
 
+FLAGS = {
+    "France": '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 3 2"><rect width="1" height="2" fill="#002395"/><rect x="1" width="1" height="2" fill="#fff"/><rect x="2" width="1" height="2" fill="#ED2939"/></svg>',
+    "UE": '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 30 20"><rect width="30" height="20" fill="#003399"/>' + "".join(
+        f'<circle cx="{15 + 6 * __import__("math").cos(i * 0.5236):.2f}" cy="{10 + 6 * __import__("math").sin(i * 0.5236):.2f}" r="1" fill="#FFCC00"/>' for i in range(12)) + '</svg>',
+    "États-Unis": '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 38 20"><rect width="38" height="20" fill="#fff"/>' + "".join(
+        f'<rect y="{i * 20 / 13:.2f}" width="38" height="{20 / 13:.2f}" fill="#B22234"/>' for i in range(0, 13, 2)) + '<rect width="16" height="10.8" fill="#3C3B6E"/></svg>',
+    "Suisse": '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 30 20"><rect width="30" height="20" fill="#D52B1E"/><rect x="13" y="4" width="4" height="12" fill="#fff"/><rect x="9" y="8" width="12" height="4" fill="#fff"/></svg>',
+    "Luxembourg": '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 30 18"><rect width="30" height="6" fill="#ED2939"/><rect y="6" width="30" height="6" fill="#fff"/><rect y="12" width="30" height="6" fill="#00A1DE"/></svg>',
+    "Royaume-Uni": '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 30 20"><rect width="30" height="20" fill="#012169"/><path d="M0 0L30 20M30 0L0 20" stroke="#fff" stroke-width="4"/><path d="M15 0V20M0 10H30" stroke="#fff" stroke-width="6"/><path d="M15 0V20M0 10H30" stroke="#C8102E" stroke-width="3"/></svg>',
+    "International": '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 30 20"><rect width="30" height="20" fill="#5B92E5"/><circle cx="15" cy="10" r="6" fill="none" stroke="#fff" stroke-width="1.4"/><path d="M9 10H21M15 4V16" stroke="#fff" stroke-width="1"/></svg>',
+}
+IMPACT_COLORS = {"critique": "#B42318", "élevé": "#C2410C", "moyen": "#A86A00", "faible": "#2F7D5B"}
+
+
+def esc_html(s) -> str:
+    import html
+    return html.escape(str(s if s is not None else ""), quote=True)
+
+
+def flag_html(jur: str) -> str:
+    svg = FLAGS.get(jur, FLAGS["International"])
+    return f"<span class='rbw-flag'><img src='{svg_uri(svg)}' alt=''>{esc_html(jur)}</span>"
+
+
+def watch_table(rows: list[dict], footnote: str = "") -> None:
+    """Tableau de veille cliquable : un clic sur le titre déplie le résumé développé et le lien vers le texte.
+    Chaque ligne : date, titre, reference, theme, resume (court), juridiction, type, impact, application,
+    nouveau (bool), resume_long, action, secteurs, statut, lien, verifie."""
+    head = ("<div class='rbw-grid rbw-head'><div>Date</div><div>Texte</div><div>Description</div><div>Juridiction</div>"
+            "<div>Type</div><div>Impact</div><div>Application</div><div>Source</div></div>")
+    items = []
+    for r in rows:
+        link = r.get("lien") or ""
+        src = (f"<a href='{esc_html(link)}' target='_blank' rel='noopener'>Ouvrir ↗</a>" if link else "—")
+        imp = r.get("impact", "")
+        new = "<span class='rbw-new'>NOUVEAU</span>" if r.get("nouveau") else ""
+        body_link = (f"<a class='rbw-btn' href='{esc_html(link)}' target='_blank' rel='noopener'>Lire le texte complet ↗</a>"
+                     if link else "<span class='rbw-meta'>Lien officiel non renseigné.</span>")
+        items.append(f"""<details><summary class='rbw-grid'>
+<div class='rbw-cell'>{esc_html(r.get('date', ''))}</div>
+<div><div class='rbw-title'><span class='rbw-caret'>▸</span>{esc_html(r.get('titre', ''))}{new}</div>
+<div class='rbw-ref'>{esc_html(r.get('reference', ''))}</div></div>
+<div class='rbw-short'><div style='color:#0E7C86;font-size:11.5px;font-weight:700;text-transform:uppercase;letter-spacing:.04em'>{esc_html(r.get('theme', ''))}</div>{esc_html(r.get('resume', ''))}</div>
+<div>{flag_html(r.get('juridiction', ''))}</div>
+<div class='rbw-cell'>{esc_html(r.get('type', ''))}<br><span style='color:#6B7480;font-size:12px'>{esc_html(r.get('statut', ''))}</span></div>
+<div class='rbw-imp' style='color:{IMPACT_COLORS.get(imp, "#1B2733")}'>{esc_html(imp.capitalize())}</div>
+<div class='rbw-cell'>{esc_html(r.get('application', '') or '—')}</div>
+<div class='rbw-cell'>{src}</div>
+</summary>
+<div class='rbw-body'>
+<p>{esc_html(r.get('resume_long') or r.get('resume', ''))}</p>
+<div class='rbw-action'><b>Action recommandée :</b> {esc_html(r.get('action', ''))}</div>
+<div class='rbw-meta'>Secteurs : {esc_html(r.get('secteurs', ''))} · Référence : {esc_html(r.get('reference', ''))} ·
+Vérifié sur le texte officiel : {esc_html(r.get('verifie', 'non'))}</div>
+{body_link}
+</div></details>""")
+    foot = f"<div class='rbw-foot'>{esc_html(footnote)}</div>" if footnote else ""
+    st.html(f"<div class='rbw'><div class='rbw-inner'>{head}{''.join(items)}{foot}</div></div>")
+
+
+def watch_banner(title: str, subtitle: str) -> None:
+    st.html(f"<div class='rbw-banner'><b>{esc_html(title)}</b><span>{esc_html(subtitle)}</span></div>")
+
+
+def welcome_banner(title: str, subtitle: str, stats: list[tuple[str, str]]) -> None:
+    stats_html = "".join(
+        f"<div style='background:rgba(255,255,255,.1);border:1px solid rgba(95,211,218,.35);border-radius:10px;"
+        f"padding:8px 16px;min-width:120px'><div style='font-size:22px;font-weight:800'>{esc_html(v)}</div>"
+        f"<div style='font-size:12px;color:#C9DDE6'>{esc_html(l)}</div></div>" for v, l in stats)
+    st.html(f"""<div style="background:linear-gradient(120deg,#0B2545 0%,#0F3A5C 60%,#0E7C86 130%);border-radius:16px;
+padding:22px 26px;color:#fff;font-family:'Source Sans Pro',Helvetica,Arial,sans-serif;display:flex;flex-wrap:wrap;
+align-items:center;gap:18px;margin-bottom:6px">
+<img src="{svg_uri(LOGO_SVG)}" width="44" height="44" alt="">
+<div style="flex:1;min-width:220px"><div style="font-size:26px;font-weight:800">{esc_html(title)}</div>
+<div style="color:#C9DDE6;font-size:14px">{esc_html(subtitle)}</div></div>
+<div style="display:flex;gap:10px;flex-wrap:wrap">{stats_html}</div></div>""")
+
+
 def brand_mark() -> None:
     """Logo et nom de la plateforme (barre latérale)."""
     st.html(f"""<div style="display:flex;align-items:center;gap:8px;margin:-6px 0 10px">
@@ -160,32 +275,57 @@ def request_dialog(user: dict, sid: str) -> None:
         st.success("Demande envoyée. Vous serez prévenu dès l'activation.")
 
 
+def _tile(user: dict, sid: str, compact: bool) -> None:
+    s = SERVICES[sid]
+    lvl = ent.access_level(user, sid)
+    with st.container(border=True):
+        tag = "" if compact else f"<div class='rb-tile-family'>{s['family']}</div>"
+        st.markdown(f"{tag}<div class='rb-tile-icon'>{s['icon']}</div><div class='rb-tile-name'>{s['name']}</div>",
+                    unsafe_allow_html=True)
+        if not compact:
+            st.markdown(f"<div class='rb-tile-pitch'>{s['pitch']}</div>", unsafe_allow_html=True)
+        st.markdown(badge(user, sid), unsafe_allow_html=True)
+        key = f"tile_{'c' if compact else 'g'}_{sid}"
+        if lvl == "locked":
+            if st.button("Demander l'accès", key=key, width="stretch"):
+                request_dialog(user, sid)
+        elif st.button("Ouvrir", key=key, type="primary" if lvl == "full" else "secondary", width="stretch"):
+            open_service(sid)
+            st.rerun()
+
+
 def launcher(user: dict, compact: bool = False) -> None:
-    """Grille de services façon Microsoft 365 : tous les services visibles, accès selon les droits."""
+    """Grille de services façon Microsoft 365 : tous les services visibles, accès selon les droits.
+    Page d'accueil : grille continue sur 4 colonnes (la famille est indiquée sur chaque tuile) ;
+    menu « Services » : regroupement par famille."""
+    order = [sid for fam in FAMILY_ORDER for sid, v in SERVICES.items() if v["family"] == fam]
+    if not compact:
+        # abonnements et services gratuits d'abord, services verrouillés ensuite
+        rank = {"full": 0, "free": 1, "locked": 2}
+        order = sorted(order, key=lambda sid: rank[ent.access_level(user, sid)])
+        ncol = 4
+        for i in range(0, len(order), ncol):
+            cols = st.columns(ncol)
+            for c, sid in zip(cols, order[i:i + ncol]):
+                with c:
+                    _tile(user, sid, compact=False)
+        return
     for fam in FAMILY_ORDER:
         sids = [k for k, v in SERVICES.items() if v["family"] == fam]
         if not sids:
             continue
         st.markdown(f"<div class='rb-family'>{fam}</div>", unsafe_allow_html=True)
-        ncol = 4 if not compact else 3
-        cols = st.columns(ncol)
+        cols = st.columns(3)
         for i, sid in enumerate(sids):
-            s = SERVICES[sid]
-            lvl = ent.access_level(user, sid)
-            with cols[i % ncol].container(border=True):
-                st.markdown(f"<div class='rb-tile-icon'>{s['icon']}</div><div class='rb-tile-name'>{s['name']}</div>",
-                            unsafe_allow_html=True)
-                if not compact:
-                    st.markdown(f"<div class='rb-tile-pitch'>{s['pitch']}</div>", unsafe_allow_html=True)
-                st.markdown(badge(user, sid), unsafe_allow_html=True)
-                key = f"tile_{'c' if compact else 'g'}_{sid}"
-                if lvl == "locked":
-                    if st.button("Demander l'accès", key=key, width="stretch"):
-                        request_dialog(user, sid)
-                elif st.button("Ouvrir", key=key, type="primary" if lvl == "full" else "secondary",
-                               width="stretch"):
-                    open_service(sid)
-                    st.rerun()
+            with cols[i % 3]:
+                _tile(user, sid, compact=True)
+
+
+def go_home() -> None:
+    """Retour à l'accueil de la plateforme (grille des services), depuis n'importe quel écran."""
+    st.session_state.service = None
+    st.session_state.mode = "user"
+    st.query_params.clear()
 
 
 def locked_panel(user: dict, sid: str, tab: str) -> None:
@@ -229,10 +369,12 @@ def export_panel(user: dict, sid: str, report_ctx: dict, key: str, formats=("PDF
 def render_service(user: dict, sid: str) -> None:
     s = SERVICES[sid]
     lvl = ent.access_level(user, sid)
-    head, grid = st.columns([5, 1])
+    head, home_col, grid = st.columns([5, 1, 1])
     head.markdown(f"<span class='rb-brand'>{s['icon']} {s['name']}</span> &nbsp; {badge(user, sid)}",
                   unsafe_allow_html=True)
     head.caption(s["pitch"])
+    if home_col.button("🏠 Accueil", key=f"home_{sid}", width="stretch"):
+        go_home(); st.rerun()
     with grid.popover("⊞ Services", width="stretch"):
         launcher(user, compact=True)
     if lvl == "locked":
