@@ -177,9 +177,86 @@ def enrich(row, fins, rels, actor: str) -> dict:
 
 
 # ------------------------------------------------------------------ affichage
+def fmt_eur(v) -> str:
+    try:
+        x = float(v)
+    except (TypeError, ValueError):
+        return "-"
+    if abs(x) >= 1e9:
+        return f"{x / 1e9:,.1f} Md€".replace(",", " ").replace(".", ",")
+    if abs(x) >= 1e6:
+        return f"{x / 1e6:,.1f} M€".replace(",", " ").replace(".", ",")
+    return f"{x:,.0f} €".replace(",", " ")
+
+
+def _identity_card(row: dict, raw: dict, data: dict) -> None:
+    """Fiche d'identité lisible (remplace l'affichage JSON)."""
+    from services.groupe import CATEGORIES, LABELS
+    siege = raw.get("siege") or {}
+    tva = raw.get("tva")
+    if isinstance(tva, dict):
+        tva = tva.get("tva_intra") or tva.get("numero") or next((v for v in tva.values() if isinstance(v, str)), "")
+    status, detail, src = data["listing"]
+    fields = [
+        ("Dénomination", row["denomination"]), ("Sigle", row.get("sigle")), ("Type d'entité", row["type_entite"]),
+        ("SIREN", row["siren"]), ("SIRET du siège", row["siret_siege"]), ("N° TVA intracommunautaire", tva or ""),
+        ("LEI", data["gleif"]["lei"]), ("N° RNA (association)", row.get("rna")),
+        ("Forme juridique", row["forme_juridique"]), ("Date de création", row["date_creation"]),
+        ("État", row["statut"]), ("Catégorie", CATEGORIES.get(row.get("categorie", ""), row.get("categorie", ""))),
+        ("Activité principale (NAF)", row["naf_code"]), ("Effectif salarié", row["tranche_effectif"]),
+        ("Adresse du siège", row["adresse_siege"]), ("Enseignes", ", ".join(siege.get("liste_enseignes") or [])),
+        ("Établissements", f"{data['etab_total']} au total, {row.get('nb_etablissements') or '?'} ouverts"),
+        ("Cotation", f"{status} · {detail}"),
+    ]
+    cells = "".join(
+        f"<div style='padding:10px 12px;border-bottom:1px solid #EEF0F3'><div style='color:#6B7480;font-size:11.5px;"
+        f"text-transform:uppercase;letter-spacing:.05em'>{ui.esc_html(k)}</div><div style='color:#1B2733;font-size:14.5px;"
+        f"font-weight:600;margin-top:2px'>{ui.esc_html(v)}</div></div>" for k, v in fields if v)
+    labels = [LABELS.get(x, x) for x in (row.get("labels") or "").split(";") if x]
+    chips = "".join(f"<span style='display:inline-block;margin:3px 6px 3px 0;padding:3px 10px;border-radius:999px;"
+                    f"background:#E6F4F5;color:#0B5D64;font-size:12.5px;font-weight:600'>{ui.esc_html(l)}</span>" for l in labels)
+    st.html(f"<div style='background:#fff;border:1px solid #E3E7EC;border-radius:12px;overflow:hidden'>"
+            f"<div style='display:grid;grid-template-columns:repeat(auto-fill,minmax(250px,1fr))'>{cells}</div>"
+            + (f"<div style='padding:10px 12px'><div style='color:#6B7480;font-size:11.5px;text-transform:uppercase;"
+               f"letter-spacing:.05em;margin-bottom:4px'>Labels et qualités</div>{chips}</div>" if chips else "") + "</div>")
+
+
+def _finances(fins: list[dict]) -> None:
+    import altair as alt
+    if not fins:
+        st.info("Comptes non publiés ou déclarés confidentiels.")
+        return
+    f = pd.DataFrame(fins)
+    f["ca"] = pd.to_numeric(f["chiffre_affaires_eur"], errors="coerce")
+    f["rn"] = pd.to_numeric(f["resultat_net_eur"], errors="coerce")
+    big = f["ca"].abs().max() >= 1e9
+    div, unit = (1e9, "Md€") if big else (1e6, "M€")
+    long = pd.concat([pd.DataFrame({"Exercice": f["exercice"], "Indicateur": "Chiffre d'affaires", "Valeur": f["ca"] / div}),
+                      pd.DataFrame({"Exercice": f["exercice"], "Indicateur": "Résultat net", "Valeur": f["rn"] / div})])
+    chart = (alt.Chart(long).mark_bar(cornerRadiusTopLeft=3, cornerRadiusTopRight=3)
+             .encode(x=alt.X("Exercice:N", title=None, axis=alt.Axis(labelAngle=0), scale=alt.Scale(paddingInner=0.35)),
+                     xOffset=alt.XOffset("Indicateur:N", scale=alt.Scale(paddingInner=0.08)),
+                     y=alt.Y("Valeur:Q", title=unit),
+                     color=alt.Color("Indicateur:N", scale=alt.Scale(range=["#0E7C86", "#E0A100"]), legend=alt.Legend(orient="top", title=None)),
+                     tooltip=["Exercice", "Indicateur", alt.Tooltip("Valeur:Q", format=",.2f", title=unit)])
+             .properties(height=280))
+    c1, c2 = st.columns([1.3, 1], gap="large")
+    c1.altair_chart(chart, width="stretch")
+    t = pd.DataFrame({"Exercice": f["exercice"], "Chiffre d'affaires": f["ca"].map(fmt_eur), "Résultat net": f["rn"].map(fmt_eur),
+                      "Marge nette": (100 * f["rn"] / f["ca"]).map(lambda x: f"{x:.1f} %" if pd.notna(x) else "-")})
+    if len(f) > 1:
+        t["Évolution du CA"] = (100 * f["ca"].pct_change()).map(lambda x: f"{x:+.1f} %" if pd.notna(x) else "-")
+    c2.markdown("**Comptes publiés**")
+    c2.dataframe(t, hide_index=True, width="stretch")
+    st.caption("Source : comptes publiés (INPI, DGFiP) via l'API Recherche d'entreprises. Les comptes consolidés d'un groupe "
+               "peuvent différer des comptes sociaux affichés ici.")
+
+
 def fiche(user, sid, r: dict) -> None:
+    from services import groupe as G
     row, fins, rels, dirigeants = normalize(r)
     st.session_state.ent_current = (row, fins, rels, dirigeants)
+    st.session_state.ent_raw = r
     if st.session_state.get("ent_enriched") != row["siren"]:
         res = enrich(row, fins, rels, user["email"])
         st.session_state.ent_enriched = row["siren"]
@@ -187,46 +264,147 @@ def fiche(user, sid, r: dict) -> None:
         db.audit(user["email"], "fiche_entite_consultee", {"siren": row["siren"], "maj": res["status"]})
     res = st.session_state.ent_res
     row = res["row"]
+    data = G.collect(row["siren"], row["denomination"])
+    st.session_state.ent_data = data
+    if st.session_state.get("ent_persisted") != row["siren"]:
+        G.persist(row["siren"], row["denomination"], data, user["email"])
+        st.session_state.ent_persisted = row["siren"]
+    status, detail, src = data["listing"]
+    subs = G.subsidiaries(data)
+    biz = G.business_relations(row["siren"], user)
+
     st.markdown(f"### {row['denomination']}")
-    st.caption(f"SIREN {row['siren']} · {row['forme_juridique']} · NAF {row['naf_code']} · créée le {row['date_creation']} · "
-               f"{row['statut']} · {row['commune']}")
+    chips = [row["forme_juridique"], f"SIREN {row['siren']}", f"NAF {row['naf_code']}", f"créée le {row['date_creation']}",
+             row["statut"], row["commune"], f"{status}" + (f" · {detail}" if status != "Non cotée selon les sources consultées" else "")]
+    st.caption(" · ".join(c for c in chips if c))
     msg = {"ajout": "Nouvelle entité ajoutée à la base.", "maj": f"Fiche mise à jour ({res['changes']} champ(s) modifié(s)).",
-           "inchange": "Aucun changement depuis la dernière mise à jour."}[res["status"]]
-    st.caption(f"🔄 {msg} Complétude {int(float(row['score_completude']) * 100)} % · risque indicatif {row['score_risque_indicatif']}/100")
+           "inchange": "Aucun changement depuis la dernière mise à jour."}[res["status"] if res["changes"] or res["status"] == "ajout" else "inchange"]
+    st.caption(f"🔄 {msg} Complétude {int(float(row['score_completude']) * 100)} % · risque indicatif {row['score_risque_indicatif']}/100"
+               + (f" · ⚠️ {' ; '.join(data['errors'])}" if data["errors"] else ""))
     ui.kpis([(fmt_eur(row["ca_dernier_eur"]), f"Chiffre d'affaires {row['exercice_dernier']}"),
              (fmt_eur(row["resultat_dernier_eur"]), "Résultat net"), (row["tranche_effectif"] or "-", "Effectif salarié"),
-             (row["nb_etablissements"] or "-", "Établissements ouverts")])
-    c1, c2 = st.columns([3, 2])
-    with c1:
-        st.markdown("**Finances publiées**")
-        if fins:
-            f = pd.DataFrame(fins).set_index("exercice")[["chiffre_affaires_eur", "resultat_net_eur"]].apply(pd.to_numeric, errors="coerce")
-            st.bar_chart(f / 1e6, y_label="M€")
+             (str(data["etab_total"] or row["nb_etablissements"] or "-"), "Établissements"),
+             (str(len(subs)), "Filiales identifiées"), ("Oui" if status == "Cotée" else "Non" if status.startswith("Non") else "Ex-cotée", "Cotée en bourse")])
+    st.write("")
+    tabs = st.tabs(["Synthèse", "Cartographie des relations", "Identité", "Finances", "Gouvernance", "Groupe et filiales",
+                    "Établissements", "Relations d'affaires", "Rapport"])
+    with tabs[0]:
+        c1, c2 = st.columns([3, 2], gap="large")
+        with c1:
+            st.markdown("**En bref**")
+            st.markdown("\n".join([
+                f"- **Activité** : NAF {row['naf_code']} · {row['tranche_effectif'] or 'effectif non renseigné'} salariés",
+                f"- **Taille** : {G.CATEGORIES.get(row.get('categorie', ''), row.get('categorie') or 'non renseignée')} · "
+                f"CA {fmt_eur(row['ca_dernier_eur'])} ({row['exercice_dernier'] or 'n.c.'})",
+                f"- **Cotation** : {status} · {detail} (source : {src})",
+                f"- **Groupe** : {len(G.parents(data, dirigeants))} société(s) mère(s) · {len(subs)} filiale(s) identifiée(s)"
+                + (f" · LEI {data['gleif']['lei']}" if data["gleif"]["lei"] else " · pas de LEI trouvé"),
+                f"- **Implantation** : {data['etab_total']} établissement(s), principalement "
+                + (", ".join(f"{r} ({n})" for r, n in G.etab_by_region(data['etabs'])[:3]) or "non renseigné"),
+                f"- **Gouvernance** : {sum(d['type'] == 'personne physique' for d in dirigeants)} dirigeant(s) personne(s) physique(s), "
+                f"{sum(d['type'] == 'personne morale' for d in dirigeants)} personne(s) morale(s)",
+                f"- **Relations d'affaires connues** : {len(biz)} (clients, fournisseurs, distributeurs...)",
+            ]))
+        with c2:
+            st.markdown("**Points d'attention**")
+            if not res["signals"]:
+                st.success("Aucun signal automatique. L'absence de signal ne prouve pas l'absence de risque.")
+            for g, t in res["signals"]:
+                (st.error if g == "élevé" else st.warning if g == "moyen" else st.info)(t)
+            if status == "Anciennement cotée":
+                st.info(f"Anciennement cotée : {detail}. Vérifier l'actionnariat actuel.")
+    with tabs[1]:
+        st.markdown(G.LEGEND)
+        st.graphviz_chart(G.dot(row, dirigeants, data, biz), width="stretch")
+        st.caption("Ajoutez clients, fournisseurs, distributeurs, grossistes ou détaillants dans l'onglet Relations d'affaires : "
+                   "ils apparaîtront dans ce schéma.")
+    with tabs[2]:
+        _identity_card(row, r, data)
+    with tabs[3]:
+        _finances(fins)
+    with tabs[4]:
+        pp = [d for d in dirigeants if d["type"] == "personne physique"]
+        pm = [d for d in dirigeants if d["type"] == "personne morale"]
+        c1, c2 = st.columns(2)
+        c1.markdown(f"**Personnes physiques ({len(pp)})**")
+        c1.dataframe(pd.DataFrame(pp)[["nom", "qualite", "annee_naissance"]].rename(columns={
+            "nom": "Nom", "qualite": "Fonction", "annee_naissance": "Année de naissance"}) if pp else pd.DataFrame(),
+            hide_index=True, width="stretch")
+        c2.markdown(f"**Personnes morales ({len(pm)})**")
+        c2.dataframe(pd.DataFrame(pm)[["nom", "qualite", "siren"]].rename(columns={
+            "nom": "Dénomination", "qualite": "Fonction", "siren": "SIREN"}) if pm else pd.DataFrame(),
+            hide_index=True, width="stretch")
+        st.caption("Les commissaires aux comptes figurent parmi les personnes morales. Bénéficiaires effectifs : accès restreint "
+                   "au RBE (intérêt légitime), non collectés automatiquement.")
+    with tabs[5]:
+        par = G.parents(data, dirigeants)
+        st.markdown(f"**Sociétés mères ({len(par)})**")
+        st.dataframe(pd.DataFrame(par), hide_index=True, width="stretch") if par else st.caption(
+            "Aucune société mère publiée (GLEIF, Wikidata). L'entité peut être tête de groupe ou non déclarée.")
+        st.markdown(f"**Filiales et participations ({len(subs)})**")
+        if subs:
+            st.dataframe(pd.DataFrame(subs).rename(columns={"nom": "Société", "pays": "Pays", "source": "Source",
+                                                             "id": "SIREN / LEI", "fiabilite": "Fiabilité"}),
+                         hide_index=True, width="stretch", height=min(420, 40 + 35 * len(subs)))
+            if data["gleif"]["children_total"] > len(data["gleif"]["children"]):
+                st.caption(f"GLEIF déclare {data['gleif']['children_total']} filiales directes ; les 100 premières sont affichées.")
         else:
-            st.caption("Comptes non publiés ou confidentiels.")
-        st.markdown("**Dirigeants (registre public)**")
-        st.dataframe(pd.DataFrame(dirigeants), hide_index=True, width="stretch")
-    with c2:
-        st.markdown("**Points d'attention**")
-        if not res["signals"]:
-            st.success("Aucun signal automatique. L'absence de signal ne prouve pas l'absence de risque.")
-        for g, t in res["signals"]:
-            (st.error if g == "élevé" else st.warning if g == "moyen" else st.info)(t)
-        st.markdown("**Identité**")
-        st.write({k: row[k] for k in ["type_entite", "rna", "siret_siege", "adresse_siege", "categorie", "labels"] if row.get(k)})
-    st.markdown("**Rapport de la fiche**")
-    ui.export_panel(user, sid, report(row, fins, dirigeants, res["signals"]), key=f"ent_{row['siren']}")
+            st.caption("Aucune filiale trouvée dans les sources publiques consultées.")
+        st.markdown("**Cotation en bourse**")
+        (st.success if status == "Cotée" else st.info)(f"{status} · {detail} · source : {src}")
+    with tabs[6]:
+        etabs = data["etabs"]
+        if not etabs:
+            st.caption("Établissements indisponibles.")
+        else:
+            reg = pd.DataFrame(G.etab_by_region(etabs), columns=["Région", "Établissements ouverts"]).set_index("Région")
+            c1, c2 = st.columns([1, 1.3])
+            c1.bar_chart(reg, horizontal=True, color="#0E7C86")
+            pts = pd.DataFrame([{"lat": pd.to_numeric(e.get("latitude"), errors="coerce"),
+                                 "lon": pd.to_numeric(e.get("longitude"), errors="coerce")} for e in etabs]).dropna()
+            if not pts.empty:
+                c2.map(pts, size=40, color="#0E7C86")
+            t = pd.DataFrame([{"SIRET": e.get("siret"), "Siège": "oui" if e.get("est_siege") else "",
+                               "Nom / enseigne": e.get("nom_commercial") or ", ".join(e.get("liste_enseignes") or []),
+                               "Adresse": e.get("adresse"), "Activité": e.get("activite_principale"),
+                               "État": "ouvert" if e.get("etat_administratif") == "A" else "fermé",
+                               "Créé le": e.get("date_creation")} for e in etabs])
+            st.dataframe(t, hide_index=True, width="stretch", height=360)
+            st.caption(f"{len(etabs)} établissement(s) affiché(s) sur {data['etab_total']}. Les succursales à l'étranger "
+                       "n'apparaissent pas dans Sirene : voir les filiales GLEIF.")
+    with tabs[7]:
+        if biz:
+            st.dataframe(pd.DataFrame(biz).rename(columns={"type": "Relation", "nom": "Contrepartie", "pays": "Pays",
+                                                            "part": "Part %", "source": "Source", "portee": "Visibilité",
+                                                            "statut": "Statut"}), hide_index=True, width="stretch")
+        else:
+            st.caption("Aucune relation d'affaires enregistrée. Les clients, fournisseurs, distributeurs, grossistes et détaillants "
+                       "ne sont pas publics : ajoutez-les ci-dessous ou déduisez-les des flux dans l'onglet Examen renforcé.")
+        G.relation_form(row["siren"], row["denomination"], user)
+    with tabs[8]:
+        ui.export_panel(user, sid, report(row, fins, dirigeants, res["signals"], data, biz), key=f"ent_{row['siren']}")
 
 
-def fmt_eur(v) -> str:
-    try:
-        x = float(v)
-    except (TypeError, ValueError):
-        return "-"
-    return f"{x / 1e6:,.1f} M€".replace(",", " ").replace(".", ",") if abs(x) >= 1e5 else f"{x:,.0f} €".replace(",", " ")
-
-
-def report(row, fins, dirigeants, signals) -> dict:
+def report(row, fins, dirigeants, signals, data=None, biz=None) -> dict:
+    from services import groupe as G
+    extra = []
+    if data:
+        status, detail, src = data["listing"]
+        subs = G.subsidiaries(data)
+        extra = [
+            {"heading": "Cotation et groupe", "bullets": [f"Cotation : {status} · {detail} (source : {src})",
+                                                         f"LEI : {data['gleif']['lei'] or 'non trouvé'}"]},
+            {"heading": "Sociétés mères", "table": {"columns": ["Société", "Pays", "Lien", "Source"],
+                                                     "rows": [[p["nom"], p["pays"], p["lien"], p["source"]] for p in G.parents(data, dirigeants)]}},
+            {"heading": f"Filiales et participations ({len(subs)})",
+             "table": {"columns": ["Société", "Pays", "Source", "Fiabilité"],
+                       "rows": [[x["nom"], x["pays"], x["source"], x["fiabilite"]] for x in subs[:60]]}},
+            {"heading": f"Établissements ({data['etab_total']})",
+             "table": {"columns": ["Région", "Établissements ouverts"], "rows": [[r, n] for r, n in G.etab_by_region(data["etabs"])]}},
+        ]
+    if biz:
+        extra.append({"heading": "Relations d'affaires", "table": {"columns": ["Relation", "Contrepartie", "Pays", "Part %", "Source"],
+                      "rows": [[b["type"], b["nom"], b.get("pays", ""), b.get("part", ""), b.get("source", "")] for b in biz]}})
     return {
         "title": f"Fiche entité : {row['denomination']}",
         "subtitle": f"SIREN {row['siren']} · {row['forme_juridique']} · NAF {row['naf_code']} · {row['statut']}",
@@ -241,37 +419,11 @@ def report(row, fins, dirigeants, signals) -> dict:
             {"heading": "Dirigeants", "table": {"columns": ["Type", "Nom", "Qualité"],
                                                 "rows": [[d["type"], d["nom"], d["qualite"]] for d in dirigeants]}},
             {"heading": "Points d'attention", "bullets": [f"[{g}] {t}" for g, t in signals] or ["Aucun signal automatique."]},
-        ],
+        ] + extra,
         "sources": ["API Recherche d'entreprises (DINUM, annuaire-entreprises.data.gouv.fr), Licence Ouverte 2.0 : "
-                    "données INSEE Sirene, INPI RNE et autres registres publics."],
+                    "données INSEE Sirene, INPI RNE et autres registres publics.",
+                    "GLEIF (LEI, relations de consolidation), Wikidata (CC0) pour la cotation et les filiales déclarées."],
     }
-
-
-def graph_dot(row, rels, dirigeants) -> str:
-    risk = int(row.get("score_risque_indicatif") or 0)
-    color = "#2E8B57" if risk < 35 else "#E0A100" if risk < 60 else "#C0392B"
-    lines = ['digraph G { rankdir=TB; bgcolor="transparent"; node [fontname="Helvetica", fontsize=10]; edge [fontname="Helvetica", fontsize=8, color="#8A96A3"];',
-             f'"C" [label="{esc(row["denomination"])}\\nSIREN {row["siren"]} · {row["naf_code"]}", shape=box, style="rounded,filled,bold", fillcolor="#FFF6E0", color="{color}", penwidth=2];']
-    for i, d in enumerate(dirigeants[:12]):
-        shape = "box" if d["type"] == "personne morale" else "ellipse"
-        lines.append(f'"D{i}" [label="{esc(d["nom"])}\\n{esc(d["qualite"])}", shape={shape}, style="rounded", color="#0B2545"];')
-        lines.append(f'"D{i}" -> "C" [label="{esc(d["qualite"] or "dirige")}", color="#0E7C86"];')
-    allrels = csvstore.read(REL)
-    if not allrels.empty:
-        mine = allrels[(allrels["cible_entity_id"] == row["entity_id"]) | (allrels["source_entity_id"] == row["entity_id"])]
-        for j, r in enumerate(mine.to_dict("records")):
-            if r["type_relation"] == "dirige":
-                continue          # déjà dessiné avec les dirigeants
-            other = r["source_nom"] if r["cible_entity_id"] == row["entity_id"] else r["cible_nom"]
-            style = "dashed" if r.get("statut") in ("propose", "proposé") else "solid"
-            node = f"R{j}"
-            lines.append(f'"{node}" [label="{esc(other)}", shape=box, style="rounded"];')
-            a, b = (node, "C") if r["cible_entity_id"] == row["entity_id"] else ("C", node)
-            lines.append(f'"{a}" -> "{b}" [label="{esc(r["type_relation"])} {esc(r.get("part_pct", ""))}", style={style}];')
-    if row.get("nb_etablissements"):
-        lines.append(f'"E" [label="{row["nb_etablissements"]} établissement(s)\\n{esc(row["commune"])}", shape=folder, color="#8A96A3"];')
-        lines.append('"C" -> "E" [label="exploite"];')
-    return "\n".join(lines) + "}"
 
 
 def esc(s) -> str:
@@ -361,6 +513,16 @@ def examen(user, sid) -> None:
         (st.error if g == "élevé" else st.warning if g == "moyen" else st.info)(s)
     st.markdown("**Contreparties principales**")
     st.dataframe(by_cp.head(25), width="stretch")
+    cur_e = st.session_state.get("ent_current")
+    if cur_e and st.button(f"Ajouter ces contreparties au schéma de {cur_e[0]['denomination']} (session uniquement)"):
+        found = []
+        for name, r in by_cp.head(20).iterrows():
+            net = t[t["contrepartie"] == name]["montant"].sum()
+            found.append({"type": "client" if net > 0 else "fournisseur", "nom": str(name)[:40],
+                          "pays": ", ".join(sorted(set(t[t["contrepartie"] == name]["pays_iban"]) - {""})),
+                          "part": r["part_%"], "source": f"flux {up.name}"})
+        st.session_state.setdefault("exam_counterparties", {})[cur_e[0]["siren"]] = found
+        st.success("Contreparties ajoutées au schéma (onglet Fiche entité > Cartographie), sans enregistrement serveur.")
     st.markdown("**Graphe des flux (10 premières contreparties)**")
     dot = ['digraph F { rankdir=LR; node [fontname="Helvetica", fontsize=9, shape=box, style=rounded]; "E" [label="Entité examinée", style="rounded,filled", fillcolor="#FFF6E0"];']
     for i, (name, r) in enumerate(by_cp.head(10).iterrows()):
@@ -431,14 +593,17 @@ def render(tab, user, sid):
 
     elif tab == "Cartographie":
         cur = st.session_state.get("ent_current")
-        if not cur:
+        if not cur or "ent_data" not in st.session_state:
             st.info("Ouvrez d'abord une fiche dans l'onglet Fiche entité.")
             return
+        from services import groupe as G
         row, fins, rels, dirigeants = cur
-        st.caption("Flèches pleines : registre officiel. Pointillés : lien proposé, à valider. Couleur du cadre : risque indicatif.")
-        dot = graph_dot(st.session_state.ent_res["row"], rels, dirigeants)
-        st.graphviz_chart(dot, width="stretch")
-        st.download_button("Télécharger le schéma (DOT, ouvrable dans Graphviz)", dot, file_name=f"cartographie_{row['siren']}.dot")
+        row = st.session_state.ent_res["row"]
+        st.markdown(G.LEGEND)
+        n = st.slider("Nombre maximal d'éléments par groupe", 5, 40, 14)
+        d = G.dot(row, dirigeants, st.session_state.ent_data, G.business_relations(row["siren"], user), max_items=n)
+        st.graphviz_chart(d, width="stretch")
+        st.download_button("Télécharger le schéma (format DOT, ouvrable dans Graphviz)", d, file_name=f"cartographie_{row['siren']}.dot")
 
     elif tab == "Examen renforcé":
         examen(user, sid)
