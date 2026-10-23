@@ -1,0 +1,13 @@
+﻿id;date;regime;programme;type_changement;nom;type_entite;pays;motif_resume;reference_officielle;lien;donnee_demo
+SAN-00001;2026-10-22;UE;Russie;ajout;EXEMPLE ALPHA TRADING;entité;RU;Ligne fictive de démonstration;EX-1000;https://www.sanctionsmap.eu;oui
+SAN-00002;2026-10-17;OFAC;SDN;ajout;EXEMPLE BETA HOLDING;personne;IR;Ligne fictive de démonstration;EX-1001;https://ofac.treasury.gov;oui
+SAN-00003;2026-10-12;ONU;Liste consolidée;radiation;EXEMPLE GAMMA SHIPPING;entité;SY;Ligne fictive de démonstration;EX-1002;https://www.un.org/securitycouncil/fr/content/un-sc-consolidated-list;oui
+SAN-00004;2026-10-07;SECO;Ordonnance;modification;EXEMPLE DELTA PERSON;personne;KP;Ligne fictive de démonstration;EX-1003;https://www.sesam.search.admin.ch;oui
+SAN-00005;2026-10-02;DG Trésor;Registre national des gels;ajout;EXEMPLE OMEGA VESSEL;navire;RU;Ligne fictive de démonstration;EX-1004;https://gels-avoirs.dgtresor.gouv.fr;oui
+SAN-00006;2026-09-27;UE;Russie;ajout;EXEMPLE SIGMA FZE;entité;AE;Ligne fictive de démonstration;EX-1005;https://www.sanctionsmap.eu;oui
+SAN-00007;2026-09-22;OFAC;SDN;modification;EXEMPLE KAPPA METALS;entité;BY;Ligne fictive de démonstration;EX-1006;https://ofac.treasury.gov;oui
+SAN-00008;2026-09-17;ONU;Liste consolidée;ajout;EXEMPLE LAMBDA PERSON;personne;MM;Ligne fictive de démonstration;EX-1007;https://www.un.org/securitycouncil/fr/content/un-sc-consolidated-list;oui
+SAN-00009;2026-09-12;SECO;Ordonnance;radiation;EXEMPLE THETA OIL;entité;VE;Ligne fictive de démonstration;EX-1008;https://www.sesam.search.admin.ch;oui
+SAN-00010;2026-09-07;DG Trésor;Registre national des gels;ajout;EXEMPLE ZETA LOGISTICS;entité;RU;Ligne fictive de démonstration;EX-1009;https://gels-avoirs.dgtresor.gouv.fr;oui
+SAN-00011;2026-09-02;UE;Russie;ajout;EXEMPLE ETA PERSON;personne;SD;Ligne fictive de démonstration;EX-1010;https://www.sanctionsmap.eu;oui
+SAN-00012;2026-08-28;OFAC;SDN;ajout;EXEMPLE IOTA TECH;entité;CN;Ligne fictive de démonstration;EX-1011;https://ofac.treasury.gov;oui
