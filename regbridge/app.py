@@ -35,43 +35,57 @@ if wanted in SERVICES and "service" not in st.session_state:
     st.session_state.landing = wanted
 
 
+CHIPS = ["Veille réglementaire", "Sanctions et embargos", "Recherche entreprise 360°", "Notoriété",
+         "Typologies de fraude", "Rapports PDF · Word · image"]
+FOOTNOTE = "Outil d'aide à la décision : chaque résultat se vérifie sur les sources officielles."
+
+
+def two_panes():
+    """Visuel à gauche, formulaire compact à droite (centré verticalement par un espace)."""
+    left, _, right, _ = st.columns([1.55, 0.12, 0.95, 0.15], vertical_alignment="center")
+    return left, right
+
+
 def first_run_setup() -> None:
-    st.markdown("<span class='rb-brand'>🛡️ RegBridge · installation</span>", unsafe_allow_html=True)
-    st.info("Aucun administrateur n'existe. Créez le compte administrateur (ou définissez ADMIN_EMAIL et "
-            "ADMIN_PASSWORD dans les secrets Streamlit).")
-    with st.form("setup"):
-        email = st.text_input("E-mail administrateur")
-        name = st.text_input("Nom")
-        pwd = st.text_input("Mot de passe", type="password", help="10 caractères, une majuscule, un chiffre")
-        if st.form_submit_button("Créer l'administrateur", type="primary"):
-            try:
-                auth.create_user(email, name or "Administrateur", pwd, role="admin")
-                st.success("Administrateur créé. Connectez-vous."); st.rerun()
-            except ValueError as e:
-                st.error(str(e))
+    left, right = two_panes()
+    with left:
+        ui.hero("Installation de la plateforme",
+                "Créez le compte administrateur. Il gère les comptes clients, active les services payants "
+                "et règle les quotas gratuits.", CHIPS, FOOTNOTE)
+    with right, st.container(border=True):
+        st.markdown("<div class='rb-auth-title'>Premier administrateur</div>"
+                    "<div class='rb-auth-sub'>Ou définissez ADMIN_EMAIL et ADMIN_PASSWORD dans les secrets.</div>",
+                    unsafe_allow_html=True)
+        with st.form("setup", border=False):
+            email = st.text_input("E-mail", placeholder="vous@exemple.fr")
+            name = st.text_input("Nom", placeholder="Prénom Nom")
+            pwd = st.text_input("Mot de passe", type="password", help="10 caractères, une majuscule, un chiffre")
+            if st.form_submit_button("Créer l'administrateur", type="primary", width="stretch"):
+                try:
+                    auth.create_user(email, name or "Administrateur", pwd, role="admin")
+                    st.success("Administrateur créé. Connectez-vous."); st.rerun()
+                except ValueError as e:
+                    st.error(str(e))
 
 
 def login_page() -> None:
-    left, right = st.columns([3, 2], gap="large")
+    left, right = two_panes()
     with left:
-        st.markdown("<span class='rb-brand'>🛡️ RegBridge</span>", unsafe_allow_html=True)
         landing = st.session_state.get("landing")
         if landing:
             s = SERVICES[landing]
-            st.markdown(f"## {s['icon']} {s['name']}")
-            st.write(s["pitch"])
-            if s["free"]:
-                st.success("Disponible gratuitement avec quota mensuel : créez un compte pour essayer.")
-            else:
-                st.info("Service sur abonnement : créez un compte puis demandez l'accès.")
+            extra = (" Disponible gratuitement avec un quota mensuel." if s["free"]
+                     else " Service sur abonnement : créez un compte puis demandez l'accès.")
+            ui.hero(f"{s['icon']} {s['name']}", s["pitch"] + extra, CHIPS, FOOTNOTE)
         else:
-            st.markdown("## Conformité LCB-FT, sanctions et fraude")
-            st.write("Veille réglementaire et sanctions, recherche d'entreprises et de notoriété, dossiers KYC, "
-                     "typologies de fraude, rapports PDF, Word et image.")
-        st.caption("Outil d'aide à la décision : chaque résultat se vérifie sur les sources officielles.")
-    with right:
-        t_login, t_signup = st.tabs(["Se connecter", "Créer un compte gratuit"])
-        with t_login, st.form("login"):
+            ui.hero("Conformité LCB-FT, sanctions et fraude, sur une seule plateforme",
+                    "Veillez, recherchez, analysez et documentez : de la veille réglementaire au rapport prêt à "
+                    "transmettre, pour les flux entre l'Europe, l'Afrique et les Caraïbes.", CHIPS, FOOTNOTE)
+    with right, st.container(border=True):
+        st.markdown("<div class='rb-auth-title'>Bienvenue</div>"
+                    "<div class='rb-auth-sub'>Connectez-vous ou créez un compte gratuit.</div>", unsafe_allow_html=True)
+        t_login, t_signup = st.tabs(["Se connecter", "Créer un compte"])
+        with t_login, st.form("login", border=False):
             space = st.radio("Espace", ["Utilisateur", "Administration"], horizontal=True)
             email = st.text_input("E-mail")
             pwd = st.text_input("Mot de passe", type="password")
@@ -87,7 +101,7 @@ def login_page() -> None:
                     if st.session_state.get("landing") and space == "Utilisateur":
                         st.session_state.service = st.session_state.pop("landing")
                     st.rerun()
-        with t_signup, st.form("signup"):
+        with t_signup, st.form("signup", border=False):
             name = st.text_input("Nom et prénom")
             org = st.text_input("Organisation")
             email = st.text_input("E-mail professionnel")
@@ -107,6 +121,7 @@ def login_page() -> None:
 def sidebar(user: dict) -> dict:
     """Barre latérale ; retourne l'utilisateur « effectif » (aperçu possible pour l'administrateur)."""
     with st.sidebar:
+        ui.brand_mark()
         st.markdown(f"**{user['name']}**  \n{user['email']}")
         st.caption(user.get("organisation") or "")
         eff = user
